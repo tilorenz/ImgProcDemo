@@ -30,22 +30,17 @@ impl Tool {
             Tool::Conv => {
                 if let Some((ix, iy)) = src_grid.hovered_idx() {
                     let conv = &tool_vars.conv;
-                    src_grid.draw_outline_clamped(ui, ix as i32 + conv.left, iy as i32 + conv.up, ix as i32 + conv.right, iy as i32 + conv.down);
+                    src_grid.draw_outline_clamped(
+                        ui,
+                        ix as i32 + conv.left,
+                        iy as i32 + conv.up,
+                        ix as i32 + conv.right,
+                        iy as i32 + conv.down);
                     dst_grid.draw_outline_clamped(ui, ix as i32, iy as i32, ix as i32, iy as i32);
-                    let mut sum = 0.0;
-                    if conv.zero_centered {
-                        sum = 127.0
-                    }
-                    for y_offset in conv.up..=conv.down {
-                        for x_offset in conv.left..=conv.right {
-                            let x_conv_idx = (x_offset - conv.left) as usize;
-                            let y_conv_idx = (y_offset - conv.up) as usize;
-                            sum += conv.mask[y_conv_idx][x_conv_idx] * src_grid.get_clamped(ix as i32 + x_offset, iy as i32 + y_offset) as f32;
-                        }
-                    }
-                    let color = sum.clamp(0.0, 255.0) as u8;
-                    dst_grid.try_draw_rect_at_idx(ui, ix as i32, iy as i32, color);
 
+                    let color = Tool::convolution(ix, iy, &conv, &src_grid);
+
+                    dst_grid.try_draw_rect_at_idx(ui, ix as i32, iy as i32, color);
                     if src_grid.pressed() {
                         dst_grid.try_set(ix as i32, iy as i32, color);
                     }
@@ -62,6 +57,47 @@ impl Tool {
                     }
                 }
             },
+        }
+    }
+
+    fn convolution(ix: u32, iy: u32, conv: &Convolution, src_grid: &PixGrid) -> u8 {
+        let mut sum = 0.0;
+        if conv.zero_centered {
+            sum = 127.0
+        }
+        for y_offset in conv.up..=conv.down {
+            for x_offset in conv.left..=conv.right {
+                let x_conv_idx = (x_offset - conv.left) as usize;
+                let y_conv_idx = (y_offset - conv.up) as usize;
+                sum += conv.mask[y_conv_idx][x_conv_idx] *
+                    src_grid.get_clamped(ix as i32 + x_offset, iy as i32 + y_offset) as f32;
+            }
+        }
+        sum.clamp(0.0, 255.0) as u8
+    }
+
+    fn apply_to_whole_image(&self, tool_vars: &ToolVars, src_grid: &mut PixGrid, dst_grid: &mut PixGrid) {
+        match self {
+            Tool::Pen => {
+                src_grid.reset_to_color(tool_vars.pen_color);
+            },
+            Tool::Cpy => {
+                for iy in 0..src_grid.height() {
+                    for ix in 0..src_grid.width() {
+                        let color = src_grid.get(ix, iy);
+                        dst_grid.try_set(ix as i32, iy as i32, color);
+                    }
+                }
+            },
+            Tool::Conv => {
+                for iy in 0..src_grid.height() {
+                    for ix in 0..src_grid.width() {
+                        let color = Tool::convolution(ix, iy, &tool_vars.conv, &src_grid);
+                        dst_grid.try_set(ix as i32, iy as i32, color);
+                    }
+                }
+            },
+            //_ => ()
         }
     }
 }
@@ -142,23 +178,33 @@ impl ImgProcDemo {
 impl eframe::App for ImgProcDemo {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading("Image Processing Demo");
+            ui.heading(egui::RichText::new("Image Processing Demo").strong().size(24.0));
             ui.horizontal(|ui| {
                 // grid column
                 ui.vertical(|ui| {
-                    ui.label("Source Image:");
+                    ui.label(egui::RichText::new("Source Image:").size(16.0));
                     self.src_grid.draw(ui);
                     ui.label(""); // little spacer
-                    ui.label("Target Image:");
+                    ui.label(egui::RichText::new("Target Image:").size(16.0));
                     self.dst_grid.draw(ui);
                     self.tool.interact(ui, &mut self.tool_vars, &mut self.src_grid, &mut self.dst_grid);
                 });
 
                 // tools column
                 ui.vertical(|ui| {
+                    ui.label(egui::RichText::new("Tool:").size(16.0));
                     self.pen_row(ui);
                     ui.selectable_value(&mut self.tool, Tool::Cpy, "Copy");
                     self.conv_row(ui);
+
+                    if ui.button("Reset").clicked() {
+                        self.src_grid.reset_to_color(180);
+                        self.dst_grid.reset_to_color(180);
+                    }
+
+                    if ui.button("Apply to whole image").clicked() {
+                        self.tool.apply_to_whole_image(&self.tool_vars, &mut self.src_grid, &mut self.dst_grid);
+                    }
                 });
             });
         });

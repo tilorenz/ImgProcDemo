@@ -150,7 +150,18 @@ impl PixGrid {
         }
     }
 
+    /// sets the whole image to color
+    pub fn reset_to_color(&mut self, color: u8) {
+        for iy in 0..self.height {
+            for ix in 0..self.width {
+                self.pixels[iy as usize][ix as usize] = color;
+            }
+        }
+    }
+
     pub fn pressed(&self) -> bool { self.pressed }
     pub fn hovered_idx(&self) -> Option<(u32, u32)> { self.hovered_idx }
+    pub fn width(&self) -> u32 { self.width }
+    pub fn height(&self) -> u32 { self.height }
 }
 
