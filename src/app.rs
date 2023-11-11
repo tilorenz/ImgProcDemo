@@ -86,8 +86,8 @@ pub struct ImgProcDemo {
 impl ImgProcDemo {
     pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         let mut s = Self {
-            src_grid: PixGrid::new(20, 12, 200, 16),
-            dst_grid: PixGrid::new(20, 12, 100, 16),
+            src_grid: PixGrid::new(20, 12, 180, 16),
+            dst_grid: PixGrid::new(20, 12, 180, 16),
             tool: Tool::Pen,
             tool_vars: ToolVars {
                 pen_color: 50,
@@ -115,19 +115,52 @@ impl ImgProcDemo {
             }
         });
     }
+
+    fn conv_row(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.selectable_value(&mut self.tool, Tool::Conv, "Convolution");
+
+            let conv = &mut self.tool_vars.conv;
+            ui.horizontal(|ui| {
+                for ix in conv.left..=conv.right {
+                    ui.vertical(|ui| {
+                        for iy in conv.up..=conv.down {
+                            let slider = egui::Slider::new(
+                                &mut conv.mask[(iy - conv.up) as usize][(ix - conv.left) as usize],
+                                -2.0..=2.0);
+                            ui.add(slider);
+                        }
+                    });
+                }
+            });
+
+            ui.toggle_value(&mut conv.zero_centered, "Zero-centered");
+        });
+    }
 }
 
 impl eframe::App for ImgProcDemo {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("Image Processing Demo");
-            self.src_grid.draw(ui);
-            self.dst_grid.draw(ui);
-            self.tool.interact(ui, &mut self.tool_vars, &mut self.src_grid, &mut self.dst_grid);
+            ui.horizontal(|ui| {
+                // grid column
+                ui.vertical(|ui| {
+                    ui.label("Source Image:");
+                    self.src_grid.draw(ui);
+                    ui.label(""); // little spacer
+                    ui.label("Target Image:");
+                    self.dst_grid.draw(ui);
+                    self.tool.interact(ui, &mut self.tool_vars, &mut self.src_grid, &mut self.dst_grid);
+                });
 
-            self.pen_row(ui);
-            ui.selectable_value(&mut self.tool, Tool::Cpy, "Copy");
-            ui.selectable_value(&mut self.tool, Tool::Conv, "Convolution");
+                // tools column
+                ui.vertical(|ui| {
+                    self.pen_row(ui);
+                    ui.selectable_value(&mut self.tool, Tool::Cpy, "Copy");
+                    self.conv_row(ui);
+                });
+            });
         });
     }
 }
