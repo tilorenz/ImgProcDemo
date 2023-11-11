@@ -248,6 +248,17 @@ impl ImgProcDemo {
         s.src_grid.try_set(5, 2, 0);
         s
     }
+
+    fn pen_row(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.selectable_value(&mut self.tool, Tool::Pen, "Pen");
+            let mut color_proxy = self.tool_vars.pen_color as f32;
+            let slider = egui::Slider::new(&mut color_proxy, 0.0..=255.0).text("Color").clamp_to_range(true);
+            if ui.add(slider).changed() {
+                self.tool_vars.pen_color = color_proxy.round() as u8;
+            }
+        });
+    }
 }
 
 impl eframe::App for ImgProcDemo {
@@ -258,7 +269,7 @@ impl eframe::App for ImgProcDemo {
             self.dst_grid.draw(ui);
             self.tool.interact(ui, &mut self.tool_vars, &mut self.src_grid, &mut self.dst_grid);
 
-            ui.selectable_value(&mut self.tool, Tool::Pen, "Pen");
+            self.pen_row(ui);
             ui.selectable_value(&mut self.tool, Tool::Cpy, "Copy");
             ui.selectable_value(&mut self.tool, Tool::Conv, "Convolution");
         });
