@@ -31,16 +31,22 @@ impl Tool {
                 if let Some((ix, iy)) = src_grid.hovered_idx {
                     let conv = &tool_vars.conv;
                     src_grid.draw_outline_clamped(ui, ix as i32 + conv.left, iy as i32 + conv.up, ix as i32 + conv.right, iy as i32 + conv.down);
-                    if src_grid.pressed {
-                        let mut sum = 0.0;
-                        for y_offset in conv.up..=conv.down {
-                            for x_offset in conv.left..=conv.right {
-                                let x_conv_idx = (x_offset - conv.left) as usize;
-                                let y_conv_idx = (y_offset - conv.up) as usize;
-                                sum += conv.mask[y_conv_idx][x_conv_idx] * src_grid.get_clamped(ix as i32 + x_offset, iy as i32 + y_offset) as f32;
-                            }
+                    dst_grid.draw_outline_clamped(ui, ix as i32, iy as i32, ix as i32, iy as i32);
+                    let mut sum = 0.0;
+                    if conv.zero_centered {
+                        sum = 127.0
+                    }
+                    for y_offset in conv.up..=conv.down {
+                        for x_offset in conv.left..=conv.right {
+                            let x_conv_idx = (x_offset - conv.left) as usize;
+                            let y_conv_idx = (y_offset - conv.up) as usize;
+                            sum += conv.mask[y_conv_idx][x_conv_idx] * src_grid.get_clamped(ix as i32 + x_offset, iy as i32 + y_offset) as f32;
                         }
-                        let color = sum.clamp(0.0, 255.0) as u8;
+                    }
+                    let color = sum.clamp(0.0, 255.0) as u8;
+                    dst_grid.try_draw_rect_at_idx(ui, ix as i32, iy as i32, color);
+
+                    if src_grid.pressed {
                         dst_grid.try_set(ix as i32, iy as i32, color);
                     }
                 }
@@ -48,6 +54,7 @@ impl Tool {
             Tool::Cpy => {
                 if let Some((ix, iy)) = src_grid.hovered_idx {
                     src_grid.draw_outline(ui, ix, iy, ix, iy);
+                    dst_grid.draw_outline_clamped(ui, ix as i32, iy as i32, ix as i32, iy as i32);
                     let color = src_grid.get(ix, iy);
                     dst_grid.try_draw_rect_at_idx(ui, ix as i32, iy as i32, color);
                     if src_grid.pressed {
