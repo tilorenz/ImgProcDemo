@@ -65,7 +65,7 @@ struct Convolution {
     right: i32,
     up: i32,
     down: i32,
-    mask: [[f32; 3]; 3],
+    mask: Vec<Vec<f32>>,
 }
 
 struct PixGrid {
@@ -93,9 +93,9 @@ impl PixGrid {
             pressed: false,
             rect: Rect::from_min_max(Pos2::new(0.0, 0.0), Pos2::new(0.0, 0.0)),
         };
-        for y in 0..height {
+        for _y in 0..height {
             let mut row_vec = Vec::with_capacity(width as usize);
-            for x in 0..width {
+            for _x in 0..width {
                 row_vec.push(init_color);
             }
             s.pixels.push(row_vec);
@@ -237,10 +237,10 @@ impl ImgProcDemo {
                 pen_color: 50,
                 conv: Convolution {
                     zero_centered: false, left: -1, right: 1, up: -1, down: 1,
-                    mask: [ // binomial filter
-                        [1.0/16.0, 2.0/16.0, 1.0/16.0],
-                        [2.0/16.0, 4.0/16.0, 2.0/16.0],
-                        [1.0/16.0, 2.0/16.0, 1.0/16.0],
+                    mask: vec![ // binomial filter
+                        vec![1.0/16.0, 2.0/16.0, 1.0/16.0],
+                        vec![2.0/16.0, 4.0/16.0, 2.0/16.0],
+                        vec![1.0/16.0, 2.0/16.0, 1.0/16.0],
                     ],
                 }
             },
