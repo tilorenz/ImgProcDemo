@@ -6,6 +6,7 @@ enum Tool {
     Pen,
     Conv,
     Cpy,
+    Boolean,
 }
 
 // the tools' parameters are stored in an own struct rather than inside the tool enum to make them
@@ -13,6 +14,8 @@ enum Tool {
 pub struct ToolVars {
     pen_color: u8,
     conv: Convolution,
+    boolean_mask: [[bool; 3];3],
+    boolean_dilation: bool,
 }
 
 impl Tool {
@@ -57,7 +60,47 @@ impl Tool {
                     }
                 }
             },
+            Tool::Boolean => {
+                if let Some((ix, iy)) = src_grid.hovered_idx() {
+                    let ix = ix as i32;
+                    let iy = iy as i32;
+                    for y_off in -1..=1 {
+                        for x_off in -1..=1 {
+                            if tool_vars.boolean_mask[(y_off + 1) as usize][(x_off + 1) as usize] {
+                                src_grid.draw_outline_clamped(ui, ix + x_off, iy + y_off, ix + x_off, iy + y_off);
+                            }
+                        }
+                    }
+                    dst_grid.draw_outline_clamped(ui, ix, iy, ix, iy);
+                    let color = Tool::bool_op(ix, iy, &tool_vars, &src_grid);
+                    dst_grid.try_draw_rect_at_idx(ui, ix, iy, color);
+                    if src_grid.pressed() {
+                        dst_grid.try_set(ix, iy, color);
+                    }
+                }
+            },
         }
+    }
+
+    fn bool_op(ix: i32, iy: i32, tool_vars: &ToolVars, src_grid: &PixGrid) -> u8 {
+        // for erosion, we start with true and only stay true if all the values are
+        // true, for dilation, we start with false and go true if any of the values is
+        // true
+        let mut b = !tool_vars.boolean_dilation;
+        let threshold = 127;
+        for y_off in -1..=1 {
+            for x_off in -1..=1 {
+                if tool_vars.boolean_mask[(y_off + 1) as usize][(x_off + 1) as usize] {
+                    let s_val = src_grid.get_clamped(ix + x_off, iy + y_off);
+                    if tool_vars.boolean_dilation {
+                        b |= s_val > threshold;
+                    } else {
+                        b &= s_val > threshold;
+                    }
+                }
+            }
+        }
+        if b {255} else {0}
     }
 
     fn convolution(ix: u32, iy: u32, conv: &Convolution, src_grid: &PixGrid) -> u8 {
@@ -97,7 +140,14 @@ impl Tool {
                     }
                 }
             },
-            //_ => ()
+            Tool::Boolean => {
+                for iy in 0..src_grid.height() {
+                    for ix in 0..src_grid.width() {
+                        let color = Tool::bool_op(ix as i32, iy as i32, &tool_vars, &src_grid);
+                        dst_grid.try_set(ix as i32, iy as i32, color);
+                    }
+                }
+            },
         }
     }
 }
@@ -134,7 +184,13 @@ impl ImgProcDemo {
                         vec![2.0/16.0, 4.0/16.0, 2.0/16.0],
                         vec![1.0/16.0, 2.0/16.0, 1.0/16.0],
                     ],
-                }
+                },
+                boolean_mask: [
+                    [false, true, false],
+                    [true, true, true],
+                    [false, true, false]
+                ],
+                boolean_dilation: true,
             },
         };
         s.src_grid.try_set(5, 2, 0);
@@ -235,6 +291,30 @@ impl ImgProcDemo {
             });
         });
     }
+
+    fn bool_row(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.selectable_value(&mut self.tool, Tool::Boolean, "Boolean operation");
+            if ui.toggle_value(&mut self.tool_vars.boolean_dilation, "Dilation").changed() {
+                self.tool = Tool::Boolean;
+            }
+            let mut b_proxy = !self.tool_vars.boolean_dilation;
+            if ui.toggle_value(&mut b_proxy, "Erosion").changed() {
+                self.tool_vars.boolean_dilation = !b_proxy;
+                self.tool = Tool::Boolean;
+            }
+
+            for ix in 0..=2 {
+                ui.vertical(|ui| {
+                    for iy in 0..=2 {
+                        if ui.checkbox(&mut self.tool_vars.boolean_mask[iy][ix], "").changed() {
+                            self.tool = Tool::Boolean;
+                        }
+                    }
+                });
+            }
+        });
+    }
 }
 
 impl eframe::App for ImgProcDemo {
@@ -258,6 +338,7 @@ impl eframe::App for ImgProcDemo {
                     self.pen_row(ui);
                     ui.selectable_value(&mut self.tool, Tool::Cpy, "Copy");
                     self.conv_row(ui);
+                    self.bool_row(ui);
 
                     ui.label(egui::RichText::new("Actions:").size(16.0));
                     if ui.button("Reset").clicked() {
