@@ -141,6 +141,47 @@ impl ImgProcDemo {
         s
     }
 
+    fn conv_binomial(&mut self) {
+        let conv = &mut self.tool_vars.conv;
+        conv.left = -1;
+        conv.right = 1;
+        conv.up = -1;
+        conv.down = 1;
+        conv.zero_centered = false;
+        conv.mask = vec![ // binomial filter
+                        vec![1.0/16.0, 2.0/16.0, 1.0/16.0],
+                        vec![2.0/16.0, 4.0/16.0, 2.0/16.0],
+                        vec![1.0/16.0, 2.0/16.0, 1.0/16.0],
+        ];
+    }
+    fn conv_v_sobel(&mut self) {
+        let conv = &mut self.tool_vars.conv;
+        conv.left = -1;
+        conv.right = 1;
+        conv.up = -1;
+        conv.down = 1;
+        conv.zero_centered = true;
+        conv.mask = vec![ // binomial filter
+                        vec![-1.0, 0.0, 1.0],
+                        vec![-2.0, 0.0, 2.0],
+                        vec![-1.0, 0.0, 1.0],
+        ];
+    }
+    fn conv_h_sobel(&mut self) {
+        let conv = &mut self.tool_vars.conv;
+        conv.left = -1;
+        conv.right = 1;
+        conv.up = -1;
+        conv.down = 1;
+        conv.zero_centered = true;
+        conv.mask = vec![ // binomial filter
+                        vec![1.0, 2.0, 1.0],
+                        vec![0.0, 0.0, 0.0],
+                        vec![-1.0, -2.0, -1.0],
+        ];
+    }
+
+
     fn pen_row(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.selectable_value(&mut self.tool, Tool::Pen, "Pen");
@@ -148,6 +189,7 @@ impl ImgProcDemo {
             let slider = egui::Slider::new(&mut color_proxy, 0.0..=255.0).text("Color").clamp_to_range(true);
             if ui.add(slider).changed() {
                 self.tool_vars.pen_color = color_proxy.round() as u8;
+                self.tool = Tool::Pen;
             }
         });
     }
@@ -164,13 +206,33 @@ impl ImgProcDemo {
                             let slider = egui::Slider::new(
                                 &mut conv.mask[(iy - conv.up) as usize][(ix - conv.left) as usize],
                                 -2.0..=2.0);
-                            ui.add(slider);
+                            if ui.add(slider).changed() {
+                                self.tool = Tool::Conv;
+                            }
                         }
                     });
                 }
             });
 
-            ui.toggle_value(&mut conv.zero_centered, "Zero-centered");
+            if ui.toggle_value(&mut conv.zero_centered, "Zero-centered").changed() {
+                self.tool = Tool::Conv;
+            }
+
+            ui.vertical(|ui| {
+                ui.label("Example filters:");
+                if ui.button("Binomial filter").clicked() {
+                    self.conv_binomial();
+                    self.tool = Tool::Conv;
+                }
+                if ui.button("Vertical Sobel").clicked() {
+                    self.conv_v_sobel();
+                    self.tool = Tool::Conv;
+                }
+                if ui.button("Horizontal Sobel").clicked() {
+                    self.conv_h_sobel();
+                    self.tool = Tool::Conv;
+                }
+            });
         });
     }
 }
@@ -197,13 +259,16 @@ impl eframe::App for ImgProcDemo {
                     ui.selectable_value(&mut self.tool, Tool::Cpy, "Copy");
                     self.conv_row(ui);
 
+                    ui.label(egui::RichText::new("Actions:").size(16.0));
                     if ui.button("Reset").clicked() {
                         self.src_grid.reset_to_color(180);
                         self.dst_grid.reset_to_color(180);
                     }
-
-                    if ui.button("Apply to whole image").clicked() {
+                    if ui.button("Apply tool to whole image").clicked() {
                         self.tool.apply_to_whole_image(&self.tool_vars, &mut self.src_grid, &mut self.dst_grid);
+                    }
+                    if ui.button("Copy target to source").clicked() {
+                        self.src_grid.copy_pixels_from(&mut self.dst_grid);
                     }
                 });
             });

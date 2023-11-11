@@ -159,6 +159,12 @@ impl PixGrid {
         }
     }
 
+    pub fn copy_pixels_from(&mut self, other: &mut PixGrid) {
+        self.width = other.width;
+        self.height = other.height;
+        self.pixels = other.pixels.clone();
+    }
+
     pub fn pressed(&self) -> bool { self.pressed }
     pub fn hovered_idx(&self) -> Option<(u32, u32)> { self.hovered_idx }
     pub fn width(&self) -> u32 { self.width }
